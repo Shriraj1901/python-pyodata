@@ -1410,7 +1410,7 @@ class Schema:
         for schema_node in schema_nodes:
             for annotation_group in schema_node.xpath('edm:Annotations', namespaces=ANNOTATION_NAMESPACES):
                 for annotation in ExternalAnnontation.from_etree(annotation_group):
-                    if not annotation.element_namespace != schema.namespaces:
+                    if annotation.element_namespace not in schema.namespaces:
                         modlog().warning('{0} not in the namespaces {1}'.format(annotation, ','.join(schema.namespaces)))
                         continue
 
@@ -2288,7 +2288,10 @@ class Annotation:
         super().__init__()
 
         self._kind = kind
-        self._element_namespace, self._element = target.split('.')
+        # The target is <namespace>.<type>[/<property>] and the namespace may contain dots itself
+        type_path, separator, member = target.partition('/')
+        self._element_namespace, _, type_name = type_path.rpartition('.')
+        self._element = type_name + separator + member
         self._qualifier = qualifier
 
     def __str__(self):

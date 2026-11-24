@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- model: metadata whose namespace contains dots (for example `com.example.service`) no longer fails with `ValueError` when it carries a value list annotation
+- model: annotations that target a namespace missing from the metadata are skipped with a warning, as intended, instead of raising `RuntimeError` or invalidating the schema
 
 ## [1.12.2]
 

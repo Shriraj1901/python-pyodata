@@ -1077,6 +1077,75 @@ def test_annot_v_l_missing_e_t(mock_warning, xml_builder_factory):
                           )
 
 
+VALUE_LIST_ANNOTATION_TEMPLATE = """
+        <EntityType Name="Dict" sap:content-version="1">
+         <Key><PropertyRef Name="Key"/></Key>
+         <Property Name="Key" Type="Edm.String" Nullable="false" sap:unicode="false" sap:label="Key" sap:creatable="false" sap:updatable="false" sap:sortable="false" sap:value-list="standard"/>
+         <Property Name="Value" Type="Edm.String" Nullable="false" sap:unicode="false" sap:label="Key" sap:creatable="false" sap:updatable="false" sap:sortable="false" sap:value-list="standard"/>
+        </EntityType>
+        <EntityContainer Name="EXAMPLE_SRV" m:IsDefaultEntityContainer="true" sap:supported-formats="atom json xlsx">
+         <EntitySet Name="DataValueHelp" EntityType="{namespace}.Dict" sap:creatable="false" sap:updatable="false" sap:deletable="false" sap:searchable="true" sap:content-version="1"/>
+        </EntityContainer>
+        <Annotations xmlns="http://docs.oasis-open.org/odata/ns/edm" Target="{target}">
+         <Annotation Term="com.sap.vocabularies.Common.v1.ValueList">
+          <Record>
+           <PropertyValue Property="Label" String="Data"/>
+           <PropertyValue Property="CollectionPath" String="DataValueHelp"/>
+           <PropertyValue Property="SearchSupported" Bool="true"/>
+           <PropertyValue Property="Parameters">
+            <Collection>
+             <Record Type="com.sap.vocabularies.Common.v1.ValueListParameterOut">
+              <PropertyValue Property="LocalDataProperty" PropertyPath="Value"/>
+              <PropertyValue Property="ValueListProperty" String="Key"/>
+             </Record>
+            </Collection>
+           </PropertyValue>
+          </Record>
+         </Annotation>
+        </Annotations>
+        """
+
+
+def test_annot_v_l_dotted_namespace(xml_builder_factory):
+    """Test that a value list annotation can target a type of a namespace containing dots"""
+
+    namespace = 'com.example.service'
+
+    xml_builder = xml_builder_factory()
+    xml_builder.add_schema(
+        namespace,
+        VALUE_LIST_ANNOTATION_TEMPLATE.format(namespace=namespace, target=f'{namespace}.Dict/Value')
+    )
+
+    schema = MetadataBuilder(xml_builder.serialize()).build()
+
+    assert schema.is_valid
+
+    value_helper = schema.entity_type('Dict').proprty('Value').value_helper
+    assert value_helper is not None
+    assert value_helper.element_namespace == namespace
+    assert value_helper.proprty_entity_type_name == 'Dict'
+    assert value_helper.proprty_name == 'Value'
+    assert value_helper.collection_path == 'DataValueHelp'
+
+
+@patch('logging.Logger.warning')
+def test_annot_unknown_namespace_is_skipped(mock_warning, xml_builder_factory):
+    """Test that an annotation targeting a namespace which is not part of the metadata is skipped with a warning"""
+
+    xml_builder = xml_builder_factory()
+    xml_builder.add_schema(
+        'KNOWN_NS',
+        VALUE_LIST_ANNOTATION_TEMPLATE.format(namespace='KNOWN_NS', target='UNKNOWN_NS.Dict/Value')
+    )
+
+    schema = MetadataBuilder(xml_builder.serialize()).build()
+
+    assert schema.is_valid
+    assert schema.entity_type('Dict').proprty('Value').value_helper is None
+    mock_warning.assert_called_with('ValueHelper(Dict/Value) not in the namespaces KNOWN_NS')
+
+
 @patch('pyodata.v2.model.PolicyIgnore.resolve')
 @patch('logging.Logger.warning')
 def test_annot_v_l_trgt_inv_prop(mock_warning, mock_resolve, xml_builder_factory):
